@@ -3,6 +3,7 @@ package com.github.lateralthoughts.hands_on_neo4j.framework.suite;
 
 import javax.inject.Singleton;
 
+import com.github.lateralthoughts.hands_on_neo4j.Exercise_4_Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
@@ -23,7 +24,8 @@ import dagger.Provides;
     injects = {
         Exercise_1_Test.class,
         Exercise_2_Test.class,
-        Exercise_3_Test.class
+        Exercise_3_Test.class,
+        Exercise_4_Test.class
     }
 )
 class GraphSuiteModule {
