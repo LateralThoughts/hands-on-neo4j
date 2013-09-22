@@ -48,6 +48,6 @@ public class ParentCommit implements Domain, Cypherizable {
 
     @Override
     public String toString() {
-        return format("%s-[:HAS_PARENT]->%s", parent, child);
+        return format("%s-[:HAS_PARENT]->%s", child, parent);
     }
 }
