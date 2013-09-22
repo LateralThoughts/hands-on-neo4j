@@ -4,6 +4,7 @@ import com.github.lateralthoughts.hands_on_neo4j.domain.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.datastructures.Entry;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.CommitUtils;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import org.neo4j.cypher.ExecutionEngine;
 import org.neo4j.graphdb.*;
@@ -335,15 +336,13 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
-     *
-     *  1 - find the good Cypher query ;-)
+     * Finds 1 commit against its provided identifier
      */
     public Node findOneCommit(String uniqueIdentifier) {
         Collection<Node> commits;
         try (Transaction tx = graphDB.beginTx();
              ResourceIterator<Node> result = engine.execute(
-                 ""/*TODO*/
+                 format("MATCH (commit:COMMIT) WHERE commit.identifier = '%s' RETURN commit", uniqueIdentifier)
              ).javaColumnAs("commit")) {
 
             commits = newArrayList(asIterable(result));
@@ -354,23 +353,19 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
-     *
-     *  1 - find the good Cypher query ;-)
+     * Deletes a commit against its identifier
      */
     public void delete(String commitIdentifier) {
         try (Transaction tx = graphDB.beginTx()) {
             engine.execute(
-                ""/*TODO*/
+                format("MATCH (commit:COMMIT) WHERE commit.identifier = '%s' DELETE commit", commitIdentifier)
             );
             tx.success();
         }
     }
 
     /**
-     * TODO
-     *
-     *  1 - find the good Cypher query ;-)
+     * Deletes commits against their identifiers
      */
     public void deleteAll(String... commitIdentifiers) {
         checkNotNull(commitIdentifiers);
@@ -378,20 +373,22 @@ public final class BIRGGIT {
 
         try (Transaction tx = graphDB.beginTx()) {
             engine.execute(
-                ""/*TODO*/
+                format(
+                    "MATCH (commit:COMMIT) WHERE commit.identifier IN ['%s'] DELETE commit",
+                    Joiner.on("','").join(commitIdentifiers)
+                )
             );
             tx.success();
         }
     }
+
     /**
-     * TODO
-     *
-     *  1 - find the good Cypher query ;-)
+     * Finds commits that are not connected to anything
      */
     public Collection<Node> findOrphanCommits() {
         try (Transaction tx = graphDB.beginTx();
              ResourceIterator<Node> orphans = engine.execute(
-                 "" /*TODO*/
+                 "START orphan=node(*) MATCH (orphan:COMMIT)-[r?]->() WHERE r IS NULL RETURN orphan AS n"
              ).javaColumnAs("n")) {
 
             Collection<Node> result = newArrayList(asIterable(orphans));
@@ -399,16 +396,19 @@ public final class BIRGGIT {
             return result;
         }
     }
+
     /**
-     * TODO
-     *
-     *  Last question: YOUR style.
-     *  Reuse previous methods (e.g. findOrphanCommits+deleteAll)
-     *  or just try yet another combo Cypher query :-)
+     * Deletes orphan commits
      */
     public void gc() {
         try (Transaction tx = graphDB.beginTx()) {
-            /*TODO*/
+            Collection<Node> orphans = findOrphanCommits();
+            String[] identifiers = new String[orphans.size()];
+            int i = 0;
+            for (Node orphan : orphans) {
+                identifiers[i++] = orphan.getProperty("identifier").toString();
+            }
+            deleteAll(identifiers);
             tx.success();
         }
     }
