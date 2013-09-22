@@ -133,12 +133,7 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
-     * Hint: cf {@link this#indexBranch(org.neo4j.graphdb.Relationship)}
-     * The code is very similar to what's needed here ;-)
-     *
-     *  1 - query index in try-block (graphDB.index()....)
-     *  2 - return single result
+     * Find an indexed branch by its name
      */
     public Relationship findBranch(String branchName) {
         checkArgument(branchName != null && !branchName.isEmpty());
@@ -147,7 +142,9 @@ public final class BIRGGIT {
         String indexedKey = uniqueIdentifiers.findSingleKey(Branch.class);
 
         try (Transaction tx = graphDB.beginTx();
-             IndexHits<Relationship> indexResults = null/*TODO*/) {
+             IndexHits<Relationship> indexResults = graphDB.index()
+                 .forRelationships(indexName)
+                 .get(indexedKey, branchName)) {
 
             Relationship result = indexResults.getSingle();
             tx.success();
@@ -156,21 +153,24 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
+     * Creates a new {@link Commit} node and updates the provided
+     * {@link Branch} relationship accordingly.
      *
-     *  1 - find branch by name
-     *  2 - delete former branch relationship
-     *  3 - create parent commit relationship
-     *          (currentBranch.commit)-[:PARENT]->(commit)
-     *  4 - recreate new branch from commit
-     *          ({@link Branch#Branch(Branch, Commit)})
-     *
+     * @return the updated {@link Branch} relationship
      */
     public Relationship commit(Commit commit, Branch currentBranch) {
         checkNotNull(commit);
 
         try (Transaction tx = graphDB.beginTx()) {
-            Relationship result = null/*TODO*/;
+            Relationship branch = findBranch(currentBranch.getName());
+            branch.delete();
+            createUniqueRelationship(
+                new ParentCommit(
+                    currentBranch.getCommit(),
+                    commit
+                )
+            );
+            Relationship result = createBranch(new Branch(currentBranch, commit));
 
             tx.success();
             return result;
@@ -179,23 +179,34 @@ public final class BIRGGIT {
 
 
     /**
-     * TODO
+     * Merges the second provided branch to the first one.
      *
-     * 1 - create new commit (merge commit)
-     * 2 - create parent relationship between new commit and 2nd branch HEAD
-     *          {@link this#createUniqueRelationship(Domain)}
-     * 3 - commit the merge commit on the 1st branch
+     * @return the updated {@link Branch} relationship
      */
     public Relationship merge(Branch firstBranch, Branch secondBranch) {
-        checkArgument(firstBranch != null);
-        checkArgument(secondBranch != null);
+        checkNotNull(firstBranch);
+        checkNotNull(secondBranch);
 
         try (Transaction tx = graphDB.beginTx()) {
-            Relationship updatedFirstBranch = null/*TODO*/;
+            Commit mergeCommit = newMergeCommit(secondBranch);
+            Relationship updatedFirstBranch = commit(mergeCommit, firstBranch);
+            createUniqueRelationship(
+                new ParentCommit(
+                    secondBranch.getCommit(),
+                    mergeCommit
+                )
+            );
 
             tx.success();
             return updatedFirstBranch;
         }
+    }
+
+    private Commit newMergeCommit(Branch mergedBranch) {
+        return new Commit(
+            commitUtils.uniqueIdentifier(),
+            format("Merged %s", mergedBranch.getName())
+        );
     }
 
     private Node createUniqueNode(final Domain entity) {
