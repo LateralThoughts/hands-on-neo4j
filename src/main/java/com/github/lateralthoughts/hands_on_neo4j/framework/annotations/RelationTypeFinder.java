@@ -3,7 +3,6 @@ package com.github.lateralthoughts.hands_on_neo4j.framework.annotations;
 import static com.github.lateralthoughts.hands_on_neo4j.framework.annotations.RelationTipFinder.endFinder;
 import static com.github.lateralthoughts.hands_on_neo4j.framework.annotations.RelationTipFinder.startFinder;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 
 import javax.inject.Inject;
@@ -41,13 +40,6 @@ public class RelationTypeFinder {
         this.domainUtils = domainUtils;
         this.startFinder = startFinder;
         this.endFinder = endFinder;
-
-        checkState(
-            classUtils != null &&
-                domainUtils != null &&
-                startFinder != null &&
-                endFinder != null
-        );
     }
 
     /**
@@ -100,10 +92,6 @@ public class RelationTypeFinder {
                 domainInstance.getClass().getSimpleName()
             ));
         }
-    }
-
-    private String getRelationshipType(Domain domain) {
-        return getRelationshipType(domain.getClass());
     }
 
     private String getRelationshipType(Class<? extends Domain> domain) {

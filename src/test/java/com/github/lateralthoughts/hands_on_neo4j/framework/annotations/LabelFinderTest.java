@@ -12,9 +12,6 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import com.github.lateralthoughts.hands_on_neo4j.domain.Domain;
-import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.FinderModule;
-import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.LabelFinder;
-import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Labeled;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.DomainUtils;
 
 import dagger.Module;

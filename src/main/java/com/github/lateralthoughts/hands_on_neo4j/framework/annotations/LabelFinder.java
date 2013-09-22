@@ -11,12 +11,12 @@ import java.util.Collection;
 
 import javax.inject.Inject;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.neo4j.graphdb.Label;
 
 import com.github.lateralthoughts.hands_on_neo4j.domain.Domain;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.ClassUtils;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.DomainUtils;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;

@@ -7,6 +7,7 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
 import com.github.lateralthoughts.hands_on_neo4j.Exercise_1_Test;
+import com.github.lateralthoughts.hands_on_neo4j.Exercise_2_Test;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.FinderModule;
 import com.github.lateralthoughts.hands_on_neo4j.framework.cypher.CypherModule;
 
@@ -19,7 +20,8 @@ import dagger.Provides;
         CypherModule.class
     },
     injects = {
-        Exercise_1_Test.class
+        Exercise_1_Test.class,
+        Exercise_2_Test.class
     }
 )
 class GraphSuiteModule {

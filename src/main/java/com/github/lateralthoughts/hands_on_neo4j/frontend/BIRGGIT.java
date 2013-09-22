@@ -1,18 +1,18 @@
 package com.github.lateralthoughts.hands_on_neo4j.frontend;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
 
 import java.util.Map;
 
 import javax.inject.Inject;
 
 import org.neo4j.graphdb.*;
+import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.UniqueFactory;
 
-import com.github.lateralthoughts.hands_on_neo4j.domain.Branch;
-import com.github.lateralthoughts.hands_on_neo4j.domain.Commit;
-import com.github.lateralthoughts.hands_on_neo4j.domain.Domain;
-import com.github.lateralthoughts.hands_on_neo4j.domain.Project;
+import com.github.lateralthoughts.hands_on_neo4j.domain.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.datastructures.Entry;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.CommitUtils;
@@ -64,7 +64,7 @@ public final class BIRGGIT {
             return node;
         }
     }
-    
+
     /**
      * Creates a new {@link Commit} node.
      */
@@ -107,12 +107,96 @@ public final class BIRGGIT {
                 relationshipTypes.findRelationshipType(newBranch)
             );
             populateProperties(relationship, newBranch);
-            
+
             tx.success();
             return relationship;
         }
     }
 
+    /**
+     * Add a {@link Branch} relationship to the index.
+     */
+    public void indexBranch(Relationship branch) {
+        checkNotNull(branch);
+
+        String indexName = indices.findName(Branch.class);
+        try (Transaction tx = graphDB.beginTx()) {
+            graphDB.index()
+                .forRelationships(indexName)
+                .add(
+                    branch,
+                    uniqueIdentifiers.findSingleKey(Branch.class),
+                    branch.getProperty("name")
+                );
+            tx.success();
+        }
+    }
+
+    /**
+     * TODO
+     * Hint: cf {@link this#indexBranch(org.neo4j.graphdb.Relationship)}
+     * The code is very similar to what's needed here ;-)
+     *
+     *  1 - query index in try-block (graphDB.index()....)
+     *  2 - return single result
+     */
+    public Relationship findBranch(String branchName) {
+        checkArgument(branchName != null && !branchName.isEmpty());
+
+        String indexName = indices.findName(Branch.class);
+        String indexedKey = uniqueIdentifiers.findSingleKey(Branch.class);
+
+        try (Transaction tx = graphDB.beginTx();
+             IndexHits<Relationship> indexResults = null/*TODO*/) {
+
+            Relationship result = indexResults.getSingle();
+            tx.success();
+            return result;
+        }
+    }
+
+    /**
+     * TODO
+     *
+     *  1 - find branch by name
+     *  2 - delete former branch relationship
+     *  3 - create parent commit relationship
+     *          (currentBranch.commit)-[:PARENT]->(commit)
+     *  4 - recreate new branch from commit
+     *          ({@link Branch#Branch(Branch, Commit)})
+     *
+     */
+    public Relationship commit(Commit commit, Branch currentBranch) {
+        checkNotNull(commit);
+
+        try (Transaction tx = graphDB.beginTx()) {
+            Relationship result = null/*TODO*/;
+
+            tx.success();
+            return result;
+        }
+    }
+
+
+    /**
+     * TODO
+     *
+     * 1 - create new commit (merge commit)
+     * 2 - create parent relationship between new commit and 2nd branch HEAD
+     *          {@link this#createUniqueRelationship(Domain)}
+     * 3 - commit the merge commit on the 1st branch
+     */
+    public Relationship merge(Branch firstBranch, Branch secondBranch) {
+        checkArgument(firstBranch != null);
+        checkArgument(secondBranch != null);
+
+        try (Transaction tx = graphDB.beginTx()) {
+            Relationship updatedFirstBranch = null/*TODO*/;
+
+            tx.success();
+            return updatedFirstBranch;
+        }
+    }
 
     private Node createUniqueNode(final Domain entity) {
         final Entry<String, Object> identity = uniqueIdentifiers.findSingleKeyValue(entity);
@@ -129,6 +213,7 @@ public final class BIRGGIT {
         return uniqueNodeFactory.getOrCreate(key, value);
     }
 
+
     private void populateLabels(Node newlyCreatedNode, Domain entity) {
         for (Label label : labels.findAllLabels(entity.getClass())) {
             newlyCreatedNode.addLabel(label);
@@ -144,7 +229,6 @@ public final class BIRGGIT {
         }
         return propertyContainer;
     }
-
 
     private Node cloneNode(Node formerNode) {
         Node clone = graphDB.createNode(labels.findAllLabels(Commit.class));
@@ -175,5 +259,27 @@ public final class BIRGGIT {
             }
             relationship.delete();
         }
+    }
+
+    private Relationship createUniqueRelationship(final Domain relationshipEntity) {
+        UniqueFactory.UniqueRelationshipFactory uniqueRelationshipFactory = new UniqueFactory.UniqueRelationshipFactory(graphDB, indices.findName(relationshipEntity)) {
+            @Override
+            protected Relationship create(Map<String, Object> properties) {
+                Node startNode = createUniqueNode(relationshipTypes.findStart(relationshipEntity));
+                Node endNode = createUniqueNode(relationshipTypes.findEnd(relationshipEntity));
+                Relationship relationship = startNode.createRelationshipTo(
+                    endNode,
+                    relationshipTypes.findRelationshipType(relationshipEntity)
+                );
+
+                for (Map.Entry<String, Object> keyValue : properties.entrySet()) {
+                    relationship.setProperty(keyValue.getKey(), keyValue.getValue());
+                }
+                return relationship;
+            }
+        };
+
+        Entry<String, Object> identity = uniqueIdentifiers.findSingleKeyValue(relationshipEntity);
+        return uniqueRelationshipFactory.getOrCreate(identity.getKey(), identity.getValue());
     }
 }

@@ -4,10 +4,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 
-import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.UniqueIdentifier;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Indexed;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Labeled;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Property;
+import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.UniqueIdentifier;
 import com.github.lateralthoughts.hands_on_neo4j.framework.cypher.Cypherizable;
 import com.github.lateralthoughts.hands_on_neo4j.framework.cypher.DomainToCypher;
 import com.google.common.base.Objects;

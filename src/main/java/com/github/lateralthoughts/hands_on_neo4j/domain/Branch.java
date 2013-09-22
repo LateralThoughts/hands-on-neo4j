@@ -6,10 +6,10 @@ import static com.google.common.base.Objects.equal;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 
-import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.UniqueIdentifier;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Indexed;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.Property;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.RelationType;
+import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.UniqueIdentifier;
 import com.github.lateralthoughts.hands_on_neo4j.framework.cypher.Cypherizable;
 import com.github.lateralthoughts.hands_on_neo4j.framework.cypher.DomainToCypher;
 import com.google.common.base.Objects;
@@ -28,6 +28,10 @@ public class Branch implements Domain, Cypherizable {
     @UniqueIdentifier("branchName")
     @Property("name")
     private final String name;
+
+    public Branch(Branch branch, Commit commit) {
+        this(branch.project, commit, branch.name);
+    }
 
     public Branch(Project project, Commit commit, String name) {
         this.project = project;
