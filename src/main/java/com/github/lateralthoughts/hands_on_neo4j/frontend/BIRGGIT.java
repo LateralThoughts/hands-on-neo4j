@@ -17,6 +17,7 @@ import java.util.Map;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
+import static org.neo4j.graphdb.Direction.INCOMING;
 import static org.neo4j.graphdb.traversal.Evaluators.toDepth;
 import static org.neo4j.kernel.Traversal.description;
 
@@ -127,13 +128,21 @@ public final class BIRGGIT {
 
         String indexName = indices.findName(Branch.class);
         try (Transaction tx = graphDB.beginTx()) {
+            Relationship relationship = findBranch(branch.getProperty("name").toString());
+            if (relationship != null) {
+                graphDB.index()
+                        .forRelationships(indexName)
+                        .remove(relationship,
+                                uniqueIdentifiers.findSingleKey(Branch.class),
+                                branch.getProperty("name"));
+            }
             graphDB.index()
-                .forRelationships(indexName)
-                .add(
-                    branch,
-                    uniqueIdentifiers.findSingleKey(Branch.class),
-                    branch.getProperty("name")
-                );
+                    .forRelationships(indexName)
+                    .add(
+                            branch,
+                            uniqueIdentifiers.findSingleKey(Branch.class),
+                            branch.getProperty("name")
+                    );
             tx.success();
         }
     }
@@ -219,46 +228,39 @@ public final class BIRGGIT {
         try (Transaction tx = graphDB.beginTx()) {
             indexBranch(createBranch(branch));
 
-            Commit parent = branch.getCommit();
             for (Commit commit : commits) {
-                createUniqueRelationship(
-                    new ParentCommit(parent, commit)
-                );
-                parent = commit;
+                indexBranch(commit(commit, branch));
+                branch = new Branch(branch, commit);
             }
-
-            indexBranch(commit(parent, branch));
             tx.success();
         }
     }
 
+    /**
+     * @see {@link this#log(String, int)}
+     */
     public Collection<Node> log(String branchName) {
         return log(branchName, DEFAULT_COMMIT_PAGE_SIZE);
     }
 
     /**
-     * TODO
-     *
-     *  1 - include only incoming relationships of a certain type ;)
-     *  2 - start traversal from branch HEAD commit
-     *  3 - at each step, add commit to log
+     * Logs all commits of specified branch up to the provided limit
      */
     public Collection<Node> log(String branchName, int limit) {
         checkArgument(limit > 0, "Limit of commits to log should be strictly positive");
 
         ImmutableList.Builder<Node> logs = ImmutableList.builder();
 
-        Relationship branch = findBranch(branchName);
-        RelationshipType type = relationshipTypes.findRelationshipType(ParentCommit.class);
-
         try (Transaction tx = graphDB.beginTx()) {
             for (Path position : description().depthFirst()
                 .evaluator(toDepth(limit - 1))
-                /*TODO*/
-                .traverse((Node)null/*TODO*/)) {
+                .relationships(
+                        relationshipTypes.findRelationshipType(ParentCommit.class),
+                        INCOMING
+                )
+                .traverse(findBranch(branchName).getEndNode())) {
 
-                Node commit = position.endNode();
-                /*TODO*/
+                logs.add(position.endNode());
             }
             tx.success();
         }
@@ -266,48 +268,60 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
-     *
-     * Ahah! Now it gets a bit harder.
-     *
-     *  1 - start a traversal similar to previous method from the first branch
-     *  2 - inside this traversal, start one from the second branch
-     *  3 - compare first and second commits' IDs and return the commit if it matches!
-     *          {@link Node#getId()}
+     * Finds the latest commits both in first and second branch.
      */
     public Node findCommonAncestor(String firstBranch, String secondBranch) {
         try (Transaction tx = graphDB.beginTx()) {
-
             RelationshipType relationshipType = relationshipTypes.findRelationshipType(ParentCommit.class);
+
             Node firstBranchStart = findBranch(firstBranch).getEndNode();
             Node secondBranchStart = findBranch(secondBranch).getEndNode();
 
-            /*
-             * TODO
-             */
+            for (Path firstBranchPosition : description()
+                .depthFirst()
+                .relationships(relationshipType, INCOMING)
+                .traverse(firstBranchStart)) {
+
+                for (Path secondBranchPosition : description()
+                    .depthFirst()
+                    .relationships(relationshipType, INCOMING)
+                    .traverse(secondBranchStart)) {
+
+                    if (secondBranchPosition.endNode().getId() == firstBranchPosition.endNode().getId()) {
+                        tx.success();
+                        return secondBranchPosition.endNode();
+                    }
+                }
+            }
             tx.success();
         }
         return null;
     }
 
     /**
-     * TODO
-     *
-     *  1 - start the traversal from *second* branch HEAD
-     *  2 - traverse and add commits up to 1st & 2nd common ancestor
-     *          obviously use: {@link this#findCommonAncestor(String, String)}
+     * Logs all commits of second branch until a join point with first branch is met.
      */
     public Collection<Node> log(String firstBranch, String secondBranch) {
-        Node ancestor = null/*TODO*/;
+        Node ancestor = findCommonAncestor(firstBranch, secondBranch);
         if (ancestor == null) {
             return ImmutableList.of();
         }
 
         ImmutableList.Builder<Node> logs = ImmutableList.builder();
         try (Transaction tx = graphDB.beginTx()) {
-            /*
-             * TODO
-             */
+            for (Path position : description()
+                .depthFirst()
+                .evaluator(toDepth(DEFAULT_COMMIT_PAGE_SIZE - 1))
+                .relationships(relationshipTypes.findRelationshipType(ParentCommit.class), INCOMING)
+                .traverse(findBranch(secondBranch).getEndNode())) {
+
+                Node currentNode = position.endNode();
+                logs.add(currentNode);
+
+                if (currentNode.equals(ancestor)) {
+                    break;
+                }
+            }
             tx.success();
         }
         return logs.build();
