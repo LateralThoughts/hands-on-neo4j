@@ -54,12 +54,12 @@ public class Exercise_3_Test extends GraphTestSuite {
 
     @Test
     public void _02_should_log_multiple_commits_on_same_branch_with_pagination() {
-        Collection<Node> logs = birggit.log(Branch.DEFAULT_BRANCH_NAME, 1);
+        Collection<Node> logs = birggit.log(Branch.DEFAULT_BRANCH_NAME, 2);
 
         try (Transaction tx = graphDB.beginTx()) {
 
-            assertThat(logs).hasSize(1);
-            assertThat(extractedCommitHashes(logs)).containsExactly("0xe43770ad");
+            assertThat(logs).hasSize(2);
+            assertThat(extractedCommitHashes(logs)).containsExactly("0xe43770ad", "123e76cdf");
             tx.success();
         }
     }
