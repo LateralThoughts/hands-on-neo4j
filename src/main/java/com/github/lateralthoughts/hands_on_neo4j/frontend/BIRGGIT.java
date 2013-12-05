@@ -5,20 +5,25 @@ import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.datastructures.Entry;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.CommitUtils;
 import com.google.common.collect.ImmutableList;
+import org.neo4j.cypher.ExecutionEngine;
 import org.neo4j.graphdb.*;
 import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.UniqueFactory;
+import org.neo4j.kernel.logging.BufferingLogger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.Lists.newArrayList;
 import static java.lang.String.format;
 import static org.neo4j.graphdb.Direction.INCOMING;
 import static org.neo4j.graphdb.traversal.Evaluators.toDepth;
+import static org.neo4j.helpers.collection.IteratorUtil.asIterable;
 import static org.neo4j.kernel.Traversal.description;
 
 /**
@@ -40,6 +45,7 @@ public final class BIRGGIT {
     private final UniqueIdentifierFinder uniqueIdentifiers;
     private final IndexFinder indices;
     private final CommitUtils commitUtils;
+    private ExecutionEngine engine;
 
     @Autowired
     public BIRGGIT(GraphDatabaseService graphDB,
@@ -57,6 +63,7 @@ public final class BIRGGIT {
         this.uniqueIdentifiers = uniqueIdentifiers;
         this.indices = indices;
         this.commitUtils = commitUtils;
+        engine = new ExecutionEngine(graphDB, new BufferingLogger());
     }
 
     /**
@@ -206,10 +213,10 @@ public final class BIRGGIT {
             Commit mergeCommit = newMergeCommit(secondBranch);
             Relationship updatedFirstBranch = commit(mergeCommit, firstBranch);
             createUniqueRelationship(
-                new ParentCommit(
-                    secondBranch.getCommit(),
-                    mergeCommit
-                )
+                    new ParentCommit(
+                            secondBranch.getCommit(),
+                            mergeCommit
+                    )
             );
 
             tx.success();
@@ -327,13 +334,92 @@ public final class BIRGGIT {
         return logs.build();
     }
 
+    /**
+     * TODO
+     *
+     *  1 - find the good Cypher query ;-)
+     */
+    public Node findOneCommit(String uniqueIdentifier) {
+        Collection<Node> commits;
+        try (Transaction tx = graphDB.beginTx();
+             ResourceIterator<Node> result = engine.execute(
+                 ""/*TODO*/
+             ).javaColumnAs("commit")) {
+
+            commits = newArrayList(asIterable(result));
+            tx.success();
+        }
+        Iterator<Node> iterator = commits.iterator();
+        return iterator.hasNext() ? iterator.next() : null;
+    }
+
+    /**
+     * TODO
+     *
+     *  1 - find the good Cypher query ;-)
+     */
+    public void delete(String commitIdentifier) {
+        try (Transaction tx = graphDB.beginTx()) {
+            engine.execute(
+                ""/*TODO*/
+            );
+            tx.success();
+        }
+    }
+
+    /**
+     * TODO
+     *
+     *  1 - find the good Cypher query ;-)
+     */
+    public void deleteAll(String... commitIdentifiers) {
+        checkNotNull(commitIdentifiers);
+        checkArgument(commitIdentifiers.length > 0);
+
+        try (Transaction tx = graphDB.beginTx()) {
+            engine.execute(
+                ""/*TODO*/
+            );
+            tx.success();
+        }
+    }
+    /**
+     * TODO
+     *
+     *  1 - find the good Cypher query ;-)
+     */
+    public Collection<Node> findOrphanCommits() {
+        try (Transaction tx = graphDB.beginTx();
+             ResourceIterator<Node> orphans = engine.execute(
+                 "" /*TODO*/
+             ).javaColumnAs("n")) {
+
+            Collection<Node> result = newArrayList(asIterable(orphans));
+            tx.success();
+            return result;
+        }
+    }
+    /**
+     * TODO
+     *
+     *  Last question: YOUR style.
+     *  Reuse previous methods (e.g. findOrphanCommits+deleteAll)
+     *  or just try yet another combo Cypher query :-)
+     */
+    public void gc() {
+        try (Transaction tx = graphDB.beginTx()) {
+            /*TODO*/
+            tx.success();
+        }
+    }
+
+
     private Commit newMergeCommit(Branch mergedBranch) {
         return new Commit(
             commitUtils.uniqueIdentifier(),
             format("Merged %s", mergedBranch.getName())
         );
     }
-
 
     private Node createUniqueNode(final Domain entity) {
         final Entry<String, Object> identity = uniqueIdentifiers.findSingleKeyValue(entity);
