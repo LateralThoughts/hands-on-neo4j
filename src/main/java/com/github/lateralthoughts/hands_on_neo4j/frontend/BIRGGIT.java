@@ -2,17 +2,18 @@ package com.github.lateralthoughts.hands_on_neo4j.frontend;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import java.util.Map;
+import org.neo4j.graphdb.index.UniqueFactory;
 
 import com.github.lateralthoughts.hands_on_neo4j.domain.Branch;
 import com.github.lateralthoughts.hands_on_neo4j.domain.Commit;
+import com.github.lateralthoughts.hands_on_neo4j.domain.Domain;
 import com.github.lateralthoughts.hands_on_neo4j.domain.Project;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.*;
+import com.github.lateralthoughts.hands_on_neo4j.framework.datastructures.Entry;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.CommitUtils;
 
 /**
@@ -52,83 +53,127 @@ public final class BIRGGIT {
     }
 
     /**
-     * TODO
-     *  1 - create node with labels {@link LabelFinder#findAllLabels(Class)}
-     *  2 - set properties
+     * Creates a new {@link Project} node.
      */
     public Node createNewProject(Project project) {
         checkNotNull(project);
+
         try (Transaction tx = graphDB.beginTx()) {
-            Node node = null/* TODO */;
+            Node node = createUniqueNode(project);
             tx.success();
             return node;
         }
     }
     
     /**
-     * TODO
-     *  1 - create node with labels {@link LabelFinder#findAllLabels(Class)}
-     *  2 - set properties
+     * Creates a new {@link Commit} node.
      */
     public Node commit(Commit commit) {
         checkNotNull(commit);
+
         try (Transaction tx = graphDB.beginTx()) {
-            Node node = null/*TODO*/;
+            Node node = createUniqueNode(commit);
             tx.success();
             return node;
         }
     }
 
     /**
-     * TODO
-     * 1 - clone node {@link this#cloneNode}
-     * 2 - overwrite message
+     * Amends an existing {@link Commit} node.
+     * Note that a new ID will be created.
      */
     public Node amend(Node node, String newMessage) {
         checkNotNull(node);
 
         try (Transaction tx = graphDB.beginTx()) {
-            Node newNode = null;
-
+            Node newNode = cloneNode(node);
+            newNode.setProperty("message", newMessage);
             tx.success();
             return newNode;
         }
     }
 
     /**
-     * TODO
-     * 1 - create nodes (project/commit)
-     * 2 - create relationship
-     * 2 - set properties
+     * Creates a new {@link Branch} node.
      */
     public Relationship createBranch(Branch newBranch) {
         checkNotNull(newBranch);
 
         try (Transaction tx = graphDB.beginTx()) {
-            Relationship relationship = null/* TODO */;
+            Node project = createUniqueNode(newBranch.getProject());
+            Node commit = createUniqueNode(newBranch.getCommit());
+            Relationship relationship = project.createRelationshipTo(
+                commit,
+                relationshipTypes.findRelationshipType(newBranch)
+            );
+            populateProperties(relationship, newBranch);
+            
             tx.success();
             return relationship;
         }
     }
 
+
+    private Node createUniqueNode(final Domain entity) {
+        final Entry<String, Object> identity = uniqueIdentifiers.findSingleKeyValue(entity);
+        final String key = identity.getKey();
+        final Object value = identity.getValue();
+        UniqueFactory.UniqueNodeFactory uniqueNodeFactory = new UniqueFactory.UniqueNodeFactory(graphDB, indices.findName(entity)) {
+            @Override
+            protected void initialize(Node newlyCreatedNode, Map<String, Object> properties) {
+                newlyCreatedNode.setProperty(key, value);
+                populateLabels(newlyCreatedNode, entity);
+                populateProperties(newlyCreatedNode, entity);
+            }
+        };
+        return uniqueNodeFactory.getOrCreate(key, value);
+    }
+
+    private void populateLabels(Node newlyCreatedNode, Domain entity) {
+        for (Label label : labels.findAllLabels(entity.getClass())) {
+            newlyCreatedNode.addLabel(label);
+        }
+    }
+
     /**
-     * 1 - TODO: create node with labels {@link LabelFinder#findAllLabels}
-     *
-     * 2 - TODO: duplicate properties
-     * iterate on {@link Node#getPropertyKeys}
-     * /!\ overwrite "identifier" property /!\
-     *
-     * 3 - TODO: duplicate relationships
-     * iterate on {@link Node#getRelationships}
-     *
-     *  - 1st case : formerNode is start node
-     *      clone.createRelationshipTo(...)
-     *  - 2nd case : formerNode is end node
-     *      currentRelationship.getEndNode().createRelationshipTo(clone,...)
-     *  - finally : delete old relationship
+     * Set exposed domain properties on Neo4J {@link PropertyContainer} node/relationship.
      */
+    private PropertyContainer populateProperties(PropertyContainer propertyContainer, Domain entity) {
+        for (Entry<String, Object> entityProperties : this.properties.findAll(entity)) {
+            propertyContainer.setProperty(entityProperties.getKey(), entityProperties.getValue());
+        }
+        return propertyContainer;
+    }
+
+
     private Node cloneNode(Node formerNode) {
-        Node clone = null/*TODO*/;
+        Node clone = graphDB.createNode(labels.findAllLabels(Commit.class));
+        setProperties(formerNode, clone);
+        overrideIdentifier(formerNode, clone);
+        reassignRelationships(formerNode, clone);
         return clone;
+    }
+
+    private void setProperties(Node formerNode, Node clone) {
+        for (String key : formerNode.getPropertyKeys()) {
+            clone.setProperty(key, formerNode.getProperty(key));
+        }
+    }
+
+    private void overrideIdentifier(Node formerNode, Node clone) {
+        String newId = String.valueOf(formerNode.getProperty("identifier")) + "_amended";
+        clone.setProperty("identifier", newId);
+    }
+
+    private void reassignRelationships(Node formerNode, Node clone) {
+        for (Relationship relationship : formerNode.getRelationships()) {
+            RelationshipType type = relationship.getType();
+            if (relationship.getStartNode().equals(formerNode)) {
+                clone.createRelationshipTo(relationship.getEndNode(), type);
+            } else {
+                relationship.getEndNode().createRelationshipTo(clone, type);
+            }
+            relationship.delete();
+        }
     }
 }
