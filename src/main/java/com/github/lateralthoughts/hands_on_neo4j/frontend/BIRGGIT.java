@@ -4,17 +4,21 @@ import com.github.lateralthoughts.hands_on_neo4j.domain.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.annotations.*;
 import com.github.lateralthoughts.hands_on_neo4j.framework.datastructures.Entry;
 import com.github.lateralthoughts.hands_on_neo4j.framework.utilities.CommitUtils;
+import com.google.common.collect.ImmutableList;
 import org.neo4j.graphdb.*;
 import org.neo4j.graphdb.index.IndexHits;
 import org.neo4j.graphdb.index.UniqueFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
+import static org.neo4j.graphdb.traversal.Evaluators.toDepth;
+import static org.neo4j.kernel.Traversal.description;
 
 /**
  * <motto>BIRGGIT, because YOLO!</motto>
@@ -25,6 +29,8 @@ import static java.lang.String.format;
  */
 @Component
 public final class BIRGGIT {
+
+    private static final int DEFAULT_COMMIT_PAGE_SIZE = 25;
 
     private final GraphDatabaseService graphDB;
     private final LabelFinder labels;
@@ -202,12 +208,118 @@ public final class BIRGGIT {
         }
     }
 
+    /**
+     * Initializes a BIRGGIT project.
+     * Almost prepares t' coffee for ye!
+     */
+    public void init(Branch branch, Commit... commits) {
+        checkNotNull(commits);
+        checkArgument(commits.length > 0);
+
+        try (Transaction tx = graphDB.beginTx()) {
+            indexBranch(createBranch(branch));
+
+            Commit parent = branch.getCommit();
+            for (Commit commit : commits) {
+                createUniqueRelationship(
+                    new ParentCommit(parent, commit)
+                );
+                parent = commit;
+            }
+
+            indexBranch(commit(parent, branch));
+            tx.success();
+        }
+    }
+
+    public Collection<Node> log(String branchName) {
+        return log(branchName, DEFAULT_COMMIT_PAGE_SIZE);
+    }
+
+    /**
+     * TODO
+     *
+     *  1 - include only incoming relationships of a certain type ;)
+     *  2 - start traversal from branch HEAD commit
+     *  3 - at each step, add commit to log
+     */
+    public Collection<Node> log(String branchName, int limit) {
+        checkArgument(limit > 0, "Limit of commits to log should be strictly positive");
+
+        ImmutableList.Builder<Node> logs = ImmutableList.builder();
+
+        Relationship branch = findBranch(branchName);
+        RelationshipType type = relationshipTypes.findRelationshipType(ParentCommit.class);
+
+        try (Transaction tx = graphDB.beginTx()) {
+            for (Path position : description().depthFirst()
+                .evaluator(toDepth(limit - 1))
+                /*TODO*/
+                .traverse((Node)null/*TODO*/)) {
+
+                Node commit = position.endNode();
+                /*TODO*/
+            }
+            tx.success();
+        }
+        return logs.build();
+    }
+
+    /**
+     * TODO
+     *
+     * Ahah! Now it gets a bit harder.
+     *
+     *  1 - start a traversal similar to previous method from the first branch
+     *  2 - inside this traversal, start one from the second branch
+     *  3 - compare first and second commits' IDs and return the commit if it matches!
+     *          {@link Node#getId()}
+     */
+    public Node findCommonAncestor(String firstBranch, String secondBranch) {
+        try (Transaction tx = graphDB.beginTx()) {
+
+            RelationshipType relationshipType = relationshipTypes.findRelationshipType(ParentCommit.class);
+            Node firstBranchStart = findBranch(firstBranch).getEndNode();
+            Node secondBranchStart = findBranch(secondBranch).getEndNode();
+
+            /*
+             * TODO
+             */
+            tx.success();
+        }
+        return null;
+    }
+
+    /**
+     * TODO
+     *
+     *  1 - start the traversal from *second* branch HEAD
+     *  2 - traverse and add commits up to 1st & 2nd common ancestor
+     *          obviously use: {@link this#findCommonAncestor(String, String)}
+     */
+    public Collection<Node> log(String firstBranch, String secondBranch) {
+        Node ancestor = null/*TODO*/;
+        if (ancestor == null) {
+            return ImmutableList.of();
+        }
+
+        ImmutableList.Builder<Node> logs = ImmutableList.builder();
+        try (Transaction tx = graphDB.beginTx()) {
+            /*
+             * TODO
+             */
+            tx.success();
+        }
+        return logs.build();
+    }
+
     private Commit newMergeCommit(Branch mergedBranch) {
         return new Commit(
             commitUtils.uniqueIdentifier(),
             format("Merged %s", mergedBranch.getName())
         );
     }
+
 
     private Node createUniqueNode(final Domain entity) {
         final Entry<String, Object> identity = uniqueIdentifiers.findSingleKeyValue(entity);
@@ -223,7 +335,6 @@ public final class BIRGGIT {
         };
         return uniqueNodeFactory.getOrCreate(key, value);
     }
-
 
     private void populateLabels(Node newlyCreatedNode, Domain entity) {
         for (Label label : labels.findAllLabels(entity.getClass())) {
